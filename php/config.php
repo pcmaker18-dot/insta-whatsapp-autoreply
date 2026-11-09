@@ -1,18 +1,12 @@
 <?php
-// إعدادات خادم الاستقبال - عدّل القيم قبل الرفع
+// خادم PHP هنا مجرد "صندوق بريد": لا يحتوي على أي مفتاح سري.
+// App Secret ورمز Instagram ورمز التحقق كلها محفوظة (مشفرة) في برنامج Windows فقط.
 return [
-    // نفس الكلمة التي تضعها في إعدادات Webhook على Meta
-    'verify_token' => 'CHANGE_ME_verify_token',
+    // بصمة SHA-256 لمفتاح API (وليس المفتاح نفسه).
+    // اضغط «توليد مفتاح» في برنامج Windows، ثم الصق البصمة المنسوخة هنا.
+    'api_key_sha256' => 'PASTE_SHA256_FROM_WINDOWS_APP',
 
-    // App Secret من لوحة تطبيق Meta (للتحقق من أن الطلبات قادمة من Meta فعلاً)
-    'app_secret'   => 'CHANGE_ME_app_secret',
-
-    // مفتاح سري طويل وعشوائي، تضعه أيضاً في برنامج Windows
-    'api_key'      => 'CHANGE_ME_long_random_api_key',
-
-    // مكان قاعدة البيانات (المجلد data محمي بملف .htaccess)
-    'db_path'      => __DIR__ . '/data/events.sqlite',
-
-    // حذف الرسائل المعالجة الأقدم من عدد الأيام هذا
-    'keep_days'    => 7,
+    'db_path'   => __DIR__ . '/data/events.sqlite',
+    'keep_days' => 7,           // حذف الرسائل المعالجة الأقدم من هذا
+    'max_body'  => 1048576,     // أقصى حجم لطلب Webhook (1MB)
 ];

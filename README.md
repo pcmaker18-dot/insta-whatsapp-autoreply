@@ -3,40 +3,44 @@
 رد تلقائي على رسائل Instagram المباشرة برسالة موحدة تطلب من المرسل التواصل عبر واتساب.
 
 ```
-Instagram ──webhook──▶ php/webhook.php ──▶ SQLite
-                                              │
-     Instagram API ◀── windows-app (GUI) ◀── php/api.php
+Meta ──webhook──▶ php/webhook.php ──▶ SQLite (طلبات خام + توقيعها)
+                                          ▲
+        برنامج Windows ──(اتصال صادر فقط)──┘  يسحب، يتحقق من التوقيع، يرد عبر Instagram API
 ```
+
+- **لا بورتات مفتوحة على جهازك**: برنامج Windows هو من يتصل بالخادم كل بضع ثوانٍ.
+- **كل المفاتيح في برنامج Windows فقط** (App Secret، رمز Instagram، رمز التحقق، مفتاح API)،
+  ومحفوظة مشفرة بـ Windows DPAPI في `settings.dat`.
+- خادم PHP لا يعرف أي مفتاح؛ يحفظ فقط **بصمة** SHA-256 لمفتاح API. لو اختُرق الخادم لا يمكن الرد باسمك.
+
+## الإعداد
+
+1. شغّل برنامج Windows واضغط **«توليد مفتاح»**؛ تُنسخ البصمة إلى الحافظة.
+2. الصق البصمة في `php/config.php` في `api_key_sha256`.
+3. ارفع مجلد `php` على استضافة HTTPS تدعم PHP 7.4+ و`pdo_sqlite` (SQLite 3.24+). اجعل `data/` قابلاً للكتابة ومحمياً.
+4. في البرنامج املأ: رابط `api.php`، App Secret، رمز Instagram، رقم واتساب ونص الرد، ثم **«حفظ»** و**«اختبار الاتصال»**
+   (هذا يرسل رمز التحقق إلى الخادم).
+5. في لوحة Meta → Instagram → Webhooks:
+   - Callback URL: `https://your-domain/php/webhook.php`
+   - Verify Token: نفس الموجود في البرنامج
+   - اشترك في `messages`
+6. اضغط **«تشغيل»**. يجب أن يبقى البرنامج مفتوحاً ليرد؛ الرسائل التي تصل وهو مغلق يرد عليها عند تشغيله.
+
+## بناء البرنامج
+
+`cd windows-app && cargo build --release` على Windows، أو من GitHub Actions (Artifacts).
 
 ## المجلدات
 
 | المجلد | الوصف |
 |---|---|
-| `php/` | يُرفع على استضافتك: يستقبل Webhook من Meta ويخزن الرسائل |
-| `windows-app/` | برنامج Windows بواجهة رسومية يسحب الرسائل ويرد عليها |
-| `server-rust/` | بديل: خادم Rust مستقل يرد مباشرة بدون PHP ولا Windows |
-
-## 1) خادم PHP
-
-1. عدّل `php/config.php`: `verify_token` و`app_secret` و`api_key` (مفتاح طويل عشوائي).
-2. ارفع مجلد `php` على استضافة تدعم PHP 7.4+ مع امتداد `pdo_sqlite` وشهادة HTTPS.
-3. تأكد أن المجلد `data` قابل للكتابة وأنه محمي (ملف `.htaccess` موجود، وعلى Nginx امنع الوصول إليه يدوياً).
-4. في لوحة تطبيق Meta → Instagram → Webhooks:
-   - Callback URL: `https://your-domain/php/webhook.php`
-   - Verify token: نفس `verify_token`
-   - اشترك في `messages`
-
-## 2) برنامج Windows
-
-- حمّل الملف `insta-autoreply-gui.exe` من تبويب **Actions** (آخر عملية بناء ← Artifacts)،
-  أو ابنِه بنفسك: `cd windows-app && cargo build --release`.
-- شغّله واملأ: رابط `api.php`، مفتاح API، رمز وصول Instagram، رقم واتساب، ونص الرد.
-- اضغط «اختبار الاتصال» ثم «تشغيل». يجب أن يبقى البرنامج مفتوحاً ليرد.
-
-الإعدادات تُحفظ في `settings.json` بجانب البرنامج (يحتوي الرمز، فلا تشاركه).
+| `php/` | صندوق بريد Webhook بدون مفاتيح |
+| `windows-app/` | البرنامج الرسومي (Rust) |
+| `server-rust/` | بديل مستقل: خادم Rust يرد مباشرة بدون PHP/Windows |
 
 ## ملاحظات
 
 - يتطلب حساب Instagram احترافياً (Business/Creator).
-- في وضع التطوير يرد التطبيق فقط على الحسابات المضافة كمختبِرين؛ للعموم يلزم App Review.
-- لا يُعاد الرد على نفس الشخص قبل مرور مدة «عدم التكرار» (24 ساعة افتراضياً).
+- في وضع التطوير يرد التطبيق فقط على حسابات المختبِرين؛ للعموم يلزم App Review من Meta.
+- لا يُرد على المرسل نفسه مرتين قبل مدة «عدم التكرار» (24 ساعة افتراضياً).
+- Instagram يسمح بالرد خلال 24 ساعة من آخر رسالة للمستخدم؛ لا تُطفئ البرنامج أطول من ذلك.

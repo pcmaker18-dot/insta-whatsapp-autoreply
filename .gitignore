@@ -2,3 +2,4 @@ target/
 .env
 settings.json
 php/data/*.sqlite
+settings.dat

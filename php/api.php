@@ -1,61 +1,77 @@
 <?php
-// واجهة يستعملها برنامج Windows لسحب الرسائل وتأكيد معالجتها
+// واجهة يتصل بها برنامج Windows (اتصال صادر منه فقط — لا بورتات مفتوحة على جهازك)
 $cfg = require __DIR__ . '/config.php';
 require __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-$key = $_SERVER['HTTP_X_API_KEY'] ?? ($_GET['key'] ?? '');
-if (!is_string($key) || !hash_equals($cfg['api_key'], $key)) {
+// الخادم لا يعرف المفتاح نفسه، فقط بصمته SHA-256
+$key = $_SERVER['HTTP_X_API_KEY'] ?? '';
+if (!is_string($key) || $key === ''
+    || !hash_equals(strtolower($cfg['api_key_sha256']), hash('sha256', $key))) {
     http_response_code(401);
     echo json_encode(['error' => 'unauthorized']);
     exit;
 }
 
+function body_json(): array
+{
+    $d = json_decode(file_get_contents('php://input'), true);
+    return is_array($d) ? $d : [];
+}
+
 try {
     $db = db($cfg);
     $action = $_GET['action'] ?? 'fetch';
+    $post = $_SERVER['REQUEST_METHOD'] === 'POST';
 
     switch ($action) {
         case 'ping':
             $pending = (int) $db->query('SELECT COUNT(*) FROM events WHERE delivered = 0')->fetchColumn();
-            echo json_encode(['ok' => true, 'pending' => $pending]);
+            $vt = kv_get($db, 'verify_token');
+            echo json_encode(['ok' => true, 'pending' => $pending, 'verify_token_set' => $vt !== null && $vt !== '']);
             break;
 
         case 'fetch':
             $rows = $db->query(
-                'SELECT id, sender, text, created_at FROM events WHERE delivered = 0 ORDER BY id LIMIT 50'
+                'SELECT id, body, signature, created_at FROM events WHERE delivered = 0 ORDER BY id LIMIT 50'
             )->fetchAll();
-            $rows = array_map(function ($r) {
-                return [
+            $out = [];
+            foreach ($rows as $r) {
+                $out[] = [
                     'id'         => (int) $r['id'],
-                    'sender'     => (string) $r['sender'],
-                    'text'       => (string) ($r['text'] ?? ''),
+                    'body'       => (string) $r['body'],
+                    'signature'  => (string) $r['signature'],
                     'created_at' => (int) $r['created_at'],
                 ];
-            }, $rows);
-            echo json_encode(['events' => $rows], JSON_UNESCAPED_UNICODE);
+            }
+            echo json_encode(['events' => $out], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             break;
 
         case 'ack':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                http_response_code(405);
-                echo json_encode(['error' => 'POST required']);
-                break;
-            }
-            $body = json_decode(file_get_contents('php://input'), true);
-            $ids = array_values(array_filter(
-                array_map('intval', $body['ids'] ?? []),
-                function ($i) { return $i > 0; }
-            ));
+            if (!$post) { http_response_code(405); echo json_encode(['error' => 'POST required']); break; }
+            $ids = array_values(array_filter(array_map('intval', body_json()['ids'] ?? []), function ($i) {
+                return $i > 0;
+            }));
             if ($ids) {
                 $ph = implode(',', array_fill(0, count($ids), '?'));
                 $db->prepare("UPDATE events SET delivered = 1 WHERE id IN ($ph)")->execute($ids);
             }
-            // تنظيف الرسائل القديمة
             $db->prepare('DELETE FROM events WHERE delivered = 1 AND created_at < ?')
                ->execute([time() - $cfg['keep_days'] * 86400]);
             echo json_encode(['ok' => true, 'acked' => count($ids)]);
+            break;
+
+        case 'set_verify':
+            if (!$post) { http_response_code(405); echo json_encode(['error' => 'POST required']); break; }
+            $vt = body_json()['verify_token'] ?? '';
+            if (!is_string($vt) || strlen($vt) < 8 || strlen($vt) > 200) {
+                http_response_code(400);
+                echo json_encode(['error' => 'verify_token must be 8-200 chars']);
+                break;
+            }
+            kv_set($db, 'verify_token', $vt);
+            echo json_encode(['ok' => true]);
             break;
 
         default:

@@ -1,13 +1,25 @@
 <?php
-// يستقبل إشعارات Instagram من Meta ويحفظ الرسائل الجديدة في قائمة انتظار
+// يستقبل Webhook من Meta ويخزنه خاماً مع توقيعه.
+// التحقق من التوقيع ومعالجة الرسائل يتمان في برنامج Windows (الذي يملك App Secret).
 $cfg = require __DIR__ . '/config.php';
 require __DIR__ . '/db.php';
 
-// 1) التحقق عند تسجيل الـ Webhook (PHP يحوّل hub.mode إلى hub_mode)
+try {
+    $db = db($cfg);
+} catch (Throwable $e) {
+    error_log('webhook db error: ' . $e->getMessage());
+    http_response_code(500);
+    exit;
+}
+
+// 1) مصافحة التحقق عند تسجيل الـ Webhook.
+//    رمز التحقق يرسله برنامج Windows إلى الخادم (ولا يُكتب في الملفات).
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $expected = kv_get($db, 'verify_token');
     $mode  = $_GET['hub_mode'] ?? '';
     $token = $_GET['hub_verify_token'] ?? '';
-    if ($mode === 'subscribe' && hash_equals($cfg['verify_token'], $token)) {
+    if ($expected !== null && $expected !== '' && $mode === 'subscribe'
+        && is_string($token) && hash_equals($expected, $token)) {
         header('Content-Type: text/plain');
         echo $_GET['hub_challenge'] ?? '';
     } else {
@@ -21,48 +33,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// 2) التحقق من توقيع Meta
-$raw = file_get_contents('php://input');
+// 2) تخزين الطلب كما هو
+$raw = file_get_contents('php://input', false, null, 0, $cfg['max_body'] + 1);
 $sig = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
-$expected = 'sha256=' . hash_hmac('sha256', $raw, $cfg['app_secret']);
-if (!hash_equals($expected, $sig)) {
-    http_response_code(401);
+
+if ($raw === false || $raw === '' || strlen($raw) > $cfg['max_body']
+    || !preg_match('/^sha256=[0-9a-f]{64}$/', $sig)) {
+    http_response_code(400);
     exit;
 }
 
-$data = json_decode($raw, true);
-if (($data['object'] ?? '') !== 'instagram') {
-    http_response_code(200);
-    exit;
-}
-
-// 3) حفظ الرسائل الواردة (مع تجاهل رسائلنا نحن is_echo والتكرار)
 try {
-    $db = db($cfg);
-    $stmt = $db->prepare(
-        'INSERT OR IGNORE INTO events (mid, sender, text, created_at) VALUES (?, ?, ?, ?)'
-    );
-    foreach ($data['entry'] ?? [] as $entry) {
-        foreach ($entry['messaging'] ?? [] as $ev) {
-            $msg = $ev['message'] ?? null;
-            if (!$msg || !empty($msg['is_echo'])) {
-                continue;
-            }
-            $sender = $ev['sender']['id'] ?? '';
-            if ($sender === '') {
-                continue;
-            }
-            $stmt->execute([
-                $msg['mid'] ?? uniqid('m_', true),
-                $sender,
-                $msg['text'] ?? '',
-                time(),
-            ]);
-        }
-    }
+    $db->prepare('INSERT INTO events (body, signature, created_at) VALUES (?, ?, ?)')
+       ->execute([$raw, $sig, time()]);
 } catch (Throwable $e) {
-    error_log('webhook error: ' . $e->getMessage());
-    http_response_code(500); // Meta ستعيد المحاولة لاحقاً
+    error_log('webhook insert error: ' . $e->getMessage());
+    http_response_code(500); // Meta ستعيد المحاولة
     exit;
 }
 

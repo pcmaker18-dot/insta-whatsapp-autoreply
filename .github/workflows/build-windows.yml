@@ -1,0 +1,23 @@
+name: Build Windows app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build GUI app (release)
+        working-directory: windows-app
+        run: cargo build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insta-autoreply-gui
+          path: windows-app/target/release/insta-autoreply-gui.exe

@@ -3,3 +3,5 @@ target/
 settings.json
 php/data/*.sqlite
 settings.dat
+memory.dat
+windows-app/gen/

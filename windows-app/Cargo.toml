@@ -1,11 +1,17 @@
 [package]
 name = "insta-autoreply-gui"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
 
+[[bin]]
+name = "InstaAutoReply"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
 [dependencies]
-native-windows-gui = "1.0.13"
-native-windows-derive = "1.0.5"
+tauri = { version = "2", features = ["custom-protocol"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -16,10 +22,9 @@ hex = "0.4"
 getrandom = "0.2"
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
-[build-dependencies]
-embed-manifest = "1.4"
-
 [profile.release]
-opt-level = "z"
+opt-level = "s"
 lto = true
+codegen-units = 1
 strip = true
+panic = "abort"

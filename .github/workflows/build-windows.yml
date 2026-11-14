@@ -16,6 +16,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: windows-app
+
       - name: Build GUI app (release)
         working-directory: windows-app
         run: cargo build --release
@@ -23,17 +27,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: insta-autoreply-gui
-          path: windows-app/target/release/insta-autoreply-gui.exe
+          path: windows-app/target/release/InstaAutoReply.exe
 
       # نسخة من آخر بناء في فرع "build" لسهولة التحميل
       - name: Publish exe to build branch
         shell: bash
         run: |
-          mkdir out && cp windows-app/target/release/insta-autoreply-gui.exe out/
+          mkdir out && cp windows-app/target/release/InstaAutoReply.exe out/
           cd out
           git init -q -b build
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add insta-autoreply-gui.exe
+          git add InstaAutoReply.exe
           git commit -q -m "Build ${GITHUB_SHA::7}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" build

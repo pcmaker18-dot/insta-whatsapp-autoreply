@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InstaAutoReply</title>
+<style>
+:root{
+  --bg:#0b0d12; --panel:#12151c; --panel-2:#171b24; --line:#232836; --line-2:#2c3242;
+  --text:#e8eaf0; --muted:#8b93a7; --dim:#5d6578;
+  --ig:#e1306c; --ig-2:#f77737; --wa:#25d366; --wa-dim:#1a9e4d;
+  --ok:#2bd17e; --warn:#f5b84b; --err:#ff5d6c; --info:#6aa6ff;
+  --radius:14px; --radius-sm:10px;
+  --grad:linear-gradient(135deg,#e1306c 0%,#f77737 45%,#25d366 100%);
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Segoe UI","Segoe UI Variable",Tahoma,Arial,sans-serif;
+  font-size:14px; line-height:1.55; overflow:hidden;
+  -webkit-font-smoothing:antialiased; user-select:none;
+}
+input,textarea,.log,.mono{user-select:text}
+button{font:inherit;cursor:pointer}
+.app{display:grid;grid-template-columns:248px 1fr;height:100vh}
+
+/* ---------- الشريط الجانبي ---------- */
+.side{
+  background:var(--panel); border-left:1px solid var(--line);
+  display:flex; flex-direction:column; padding:22px 16px;
+}
+.brand{display:flex;align-items:center;gap:12px;padding:0 6px 22px}
+.logo{
+  width:42px;height:42px;border-radius:12px;background:var(--grad);
+  display:grid;place-items:center;box-shadow:0 6px 18px rgba(225,48,108,.35)
+}
+.brand h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px}
+.brand small{display:block;color:var(--muted);font-size:12px;margin-top:-2px}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{
+  display:flex;align-items:center;gap:12px;width:100%;
+  background:none;border:0;color:var(--muted);text-align:right;
+  padding:11px 12px;border-radius:var(--radius-sm);font-size:14px;transition:.15s;
+}
+.nav button svg{width:19px;height:19px;flex:none;opacity:.85}
+.nav button:hover{background:var(--panel-2);color:var(--text)}
+.nav button.active{background:var(--panel-2);color:var(--text);box-shadow:inset -3px 0 0 var(--ig)}
+.nav .badge{margin-inline-start:auto;background:var(--err);color:#fff;font-size:11px;border-radius:20px;padding:0 7px;display:none}
+.side-foot{margin-top:auto;padding:14px 8px 0;border-top:1px solid var(--line)}
+.status{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+.running .dot{background:var(--ok);box-shadow:0 0 0 4px rgba(43,209,126,.15);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(43,209,126,.18)}50%{box-shadow:0 0 0 7px rgba(43,209,126,.04)}}
+.ver{color:var(--dim);font-size:11px;margin-top:8px}
+
+/* ---------- المحتوى ---------- */
+.main{display:flex;flex-direction:column;min-width:0}
+.top{
+  display:flex;align-items:center;gap:16px;padding:20px 30px;
+  border-bottom:1px solid var(--line);background:rgba(18,21,28,.6)
+}
+.top h2{margin:0;font-size:20px;font-weight:700}
+.top p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.top .spacer{flex:1}
+.content{flex:1;overflow:auto;padding:26px 30px 40px}
+.page{display:none;animation:fade .2s ease}
+.page.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- أزرار ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1px solid var(--line-2);background:var(--panel-2);color:var(--text);
+  padding:9px 16px;border-radius:var(--radius-sm);font-size:13.5px;font-weight:600;transition:.15s;white-space:nowrap
+}
+.btn:hover{border-color:#3a4256;background:#1d2230}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn svg{width:16px;height:16px}
+.btn.primary{background:var(--wa);border-color:var(--wa);color:#05210f}
+.btn.primary:hover{background:#2ee175}
+.btn.danger{background:rgba(255,93,108,.12);border-color:rgba(255,93,108,.4);color:#ff8c97}
+.btn.danger:hover{background:rgba(255,93,108,.2)}
+.btn.big{padding:12px 22px;font-size:14.5px;border-radius:12px}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--text);background:var(--panel-2)}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.spin{width:15px;height:15px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ---------- بطاقات ---------- */
+.grid{display:grid;gap:18px}
+.stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.two{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.card h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.card .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+.card-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.card-head .sub{margin:0}
+.card-head .spacer{flex:1}
+.stat{position:relative;overflow:hidden}
+.stat .label{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:8px}
+.stat .num{font-size:30px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.stat .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center}
+.stat .ic svg{width:16px;height:16px}
+.c-ok{background:rgba(43,209,126,.13);color:var(--ok)}
+.c-info{background:rgba(106,166,255,.13);color:var(--info)}
+.c-warn{background:rgba(245,184,75,.13);color:var(--warn)}
+.c-err{background:rgba(255,93,108,.13);color:var(--err)}
+
+/* قائمة الجاهزية */
+.checks{display:flex;flex-direction:column;gap:2px}
+.check{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px dashed var(--line)}
+.check:last-child{border-bottom:0}
+.check .mark{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--panel-2);color:var(--dim)}
+.check.done .mark{background:rgba(43,209,126,.15);color:var(--ok)}
+.check .mark svg{width:13px;height:13px}
+.check .t{flex:1}
+.check .t small{display:block;color:var(--muted);font-size:12px}
+.link{color:var(--info);background:none;border:0;padding:0;font-size:12.5px}
+.link:hover{text-decoration:underline}
+
+/* النشاط */
+.activity{display:flex;flex-direction:column}
+.act{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.act:last-child{border-bottom:0}
+.act .lv{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none}
+.act .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.act time{color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
+.empty{color:var(--dim);text-align:center;padding:30px 0;font-size:13px}
+
+/* ---------- نماذج ---------- */
+.form{display:grid;gap:18px}
+.field label{display:block;font-weight:600;font-size:13px;margin-bottom:7px}
+.field .hint{color:var(--muted);font-size:12px;margin-top:6px}
+.inp{position:relative;display:flex;gap:8px}
+.inp input,.field textarea{
+  flex:1;width:100%;background:var(--bg);border:1px solid var(--line-2);color:var(--text);
+  border-radius:var(--radius-sm);padding:10px 13px;font:inherit;font-size:13.5px;outline:none;transition:.15s
+}
+.inp input:focus,.field textarea:focus{border-color:var(--ig);box-shadow:0 0 0 3px rgba(225,48,108,.15)}
+.inp input.ltr{direction:ltr;text-align:left;font-family:Consolas,"Cascadia Mono",monospace;font-size:13px}
+.eye{
+  position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  background:none;border:0;color:var(--dim);padding:6px;border-radius:6px;display:grid
+}
+.eye:hover{color:var(--text)}
+.eye svg{width:17px;height:17px}
+.inp.has-btn .eye{left:auto;right:auto}
+.inp input.pw{padding-left:40px}
+.field textarea{min-height:150px;resize:vertical;line-height:1.7}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.actions{display:flex;gap:10px;justify-content:flex-start;padding-top:6px;border-top:1px solid var(--line);margin-top:4px;padding-top:18px}
+.hashbox{
+  display:none;margin-top:10px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:rgba(106,166,255,.08);border:1px solid rgba(106,166,255,.28);font-size:12.5px
+}
+.hashbox.show{display:block}
+.hashbox code{display:block;direction:ltr;text-align:left;font-family:Consolas,monospace;word-break:break-all;margin:8px 0;color:#bcd4ff;background:rgba(0,0,0,.25);padding:8px 10px;border-radius:8px}
+.section-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;margin:0 0 -6px}
+
+/* ---------- مفاتيح التبديل ---------- */
+.toggle{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line);cursor:pointer}
+.toggle:last-child{border-bottom:0}
+.toggle input{display:none}
+.sw{width:38px;height:22px;border-radius:20px;background:var(--line-2);position:relative;flex:none;transition:.2s;margin-top:2px}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.toggle input:checked + .sw{background:var(--wa)}
+.toggle input:checked + .sw::after{right:19px}
+.toggle b{display:block;font-size:13.5px}
+.toggle small{color:var(--muted);font-size:12px}
+.shield{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 11px;border-radius:30px;background:rgba(43,209,126,.09);border:1px solid rgba(43,209,126,.22);color:#8de8b5}
+.pill svg{width:13px;height:13px}
+.memrow{display:flex;gap:18px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.memrow b{color:var(--text);font-size:15px;display:block}
+
+/* ---------- معاينة الرسالة ---------- */
+.phone{
+  background:#000;border:1px solid var(--line-2);border-radius:26px;padding:14px;max-width:340px;margin:0 auto;
+  box-shadow:var(--shadow)
+}
+.phone-top{display:flex;align-items:center;gap:10px;padding:4px 6px 12px;border-bottom:1px solid #1f1f1f}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--grad);padding:2px}
+.avatar i{display:block;width:100%;height:100%;border-radius:50%;background:#111;border:2px solid #000}
+.phone-top b{font-size:13px}
+.phone-top small{display:block;color:#8e8e8e;font-size:11px;margin-top:-3px}
+.chat{padding:14px 4px 6px;display:flex;flex-direction:column;gap:8px;min-height:260px}
+.bubble{max-width:82%;padding:9px 13px;border-radius:20px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+.bubble.them{align-self:flex-end;background:#262626;color:#fff;border-bottom-left-radius:6px}
+.bubble.me{align-self:flex-start;background:linear-gradient(135deg,#7b3cf3,#c13584 60%,#e1306c);color:#fff;border-bottom-right-radius:6px}
+.bubble a{color:#fff;text-decoration:underline;direction:ltr;unicode-bidi:embed}
+.chat .meta{align-self:flex-start;color:#8e8e8e;font-size:10.5px;margin-top:-4px}
+.wa-card{
+  display:flex;align-items:center;gap:12px;margin-top:18px;padding:12px 14px;border-radius:12px;
+  background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.25);font-size:12.5px
+}
+.wa-card svg{width:26px;height:26px;color:var(--wa);flex:none}
+.wa-card code{direction:ltr;display:inline-block;font-family:Consolas,monospace;color:#9ff0c0}
+
+/* ---------- السجل ---------- */
+.log-tools{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.chip{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);padding:6px 13px;border-radius:30px;font-size:12.5px}
+.chip.active{color:var(--text);border-color:var(--ig);background:rgba(225,48,108,.1)}
+.log{
+  background:#080a0e;border:1px solid var(--line);border-radius:var(--radius);
+  height:calc(100vh - 250px);overflow:auto;padding:8px 0;font-size:13px
+}
+.log .ln{display:grid;grid-template-columns:72px 76px 1fr;gap:10px;padding:6px 16px;border-bottom:1px solid rgba(35,40,54,.5)}
+.log .ln:hover{background:rgba(255,255,255,.02)}
+.log time{color:var(--dim);font-family:Consolas,monospace;font-size:12px;direction:ltr;text-align:right}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:1px 0;text-align:center;height:fit-content}
+.tag.ok{background:rgba(43,209,126,.12);color:var(--ok)}
+.tag.info{background:rgba(106,166,255,.12);color:var(--info)}
+.tag.warn{background:rgba(245,184,75,.12);color:var(--warn)}
+.tag.error{background:rgba(255,93,108,.12);color:var(--err)}
+.log .tx{word-break:break-word}
+
+/* ---------- خطوات الإعداد ---------- */
+.steps{counter-reset:s;display:flex;flex-direction:column;gap:14px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:flex;gap:14px;color:var(--muted);font-size:13px}
+.steps li::before{
+  content:counter(s);width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--panel-2);border:1px solid var(--line-2);color:var(--text);font-weight:700;font-size:12px
+}
+.steps b{color:var(--text)}
+.steps code{direction:ltr;unicode-bidi:embed;font-family:Consolas,monospace;font-size:12px;background:var(--panel-2);padding:1px 6px;border-radius:5px;color:#ffc2d6}
+
+/* ---------- إشعارات ---------- */
+.toasts{position:fixed;bottom:22px;left:22px;display:flex;flex-direction:column;gap:10px;z-index:50}
+.toast{
+  display:flex;align-items:center;gap:10px;min-width:260px;max-width:420px;
+  background:var(--panel-2);border:1px solid var(--line-2);border-radius:12px;padding:12px 16px;
+  box-shadow:var(--shadow);font-size:13px;animation:tin .25s ease
+}
+.toast .bar{width:4px;align-self:stretch;border-radius:4px}
+.toast.ok .bar{background:var(--ok)} .toast.error .bar{background:var(--err)} .toast.info .bar{background:var(--info)}
+@keyframes tin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#262b38;border-radius:10px;border:3px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+
+@media (max-width:1100px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ===== الشريط الجانبي ===== -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11.5h7M12 8v7"/></svg>
+      </div>
+      <div><h1>InstaAutoReply</h1><small>Instagram ← WhatsApp</small></div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button data-page="dash" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>
+        لوحة التحكم
+      </button>
+      <button data-page="conn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M17 6l3 3M15 8l2 2"/></svg>
+        الاتصال والمفاتيح
+      </button>
+      <button data-page="msg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        رسالة الرد
+      </button>
+      <button data-page="safe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        الحماية والامتثال
+      </button>
+      <button data-page="logs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        السجل <span class="badge" id="errBadge">0</span>
+      </button>
+      <button data-page="help">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+        دليل الإعداد
+      </button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="status" id="sideStatus"><span class="dot"></span><span id="sideStatusText">متوقف</span></div>
+      <div class="ver">الإصدار 0.4.0 · المفاتيح مشفرة على هذا الجهاز</div>
+    </div>
+  </aside>
+
+  <!-- ===== المحتوى ===== -->
+  <main class="main">
+    <header class="top">
+      <div>
+        <h2 id="pageTitle">لوحة التحكم</h2>
+        <p id="pageSub">نظرة عامة على نشاط الرد التلقائي</p>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn primary big" id="btnToggle">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>
+        <span>تشغيل الرد التلقائي</span>
+      </button>
+    </header>
+
+    <div class="content">
+
+      <!-- لوحة التحكم -->
+      <section class="page active" id="page-dash">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="label"><span class="ic c-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg></span>ردود مرسلة</div>
+            <div class="num" id="stReplied">0</div>
+          </div>
+          <div class="card stat">
+            <div class="label"><span class="ic c-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg></span>طلبات معالجة</div>
+            <div class="num" id="stProcessed">0</div>
+          </div>
+          <div class="card stat">
+            <div class="label"><span class="ic c-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>تخطّي (رد سابق)</div>
+            <div class="num" id="stSkipped">0</div>
+          </div>
+          <div class="card stat">
+            <div class="label"><span class="ic c-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>أخطاء</div>
+            <div class="num" id="stErrors">0</div>
+          </div>
+        </div>
+
+        <div class="grid two" style="margin-top:18px">
+          <div class="card">
+            <div class="card-head">
+              <div><h3>آخر النشاط</h3><p class="sub" id="lastAct">لا يوجد نشاط بعد</p></div>
+              <div class="spacer"></div>
+              <button class="btn ghost sm" data-go="logs">عرض السجل الكامل</button>
+            </div>
+            <div class="activity" id="activity"><div class="empty">ستظهر هنا الردود فور تشغيل البرنامج</div></div>
+            <div class="memrow">
+              <div><b id="mContacts">0</b>محادثات في الذاكرة</div>
+              <div><b id="mHuman">0</b>يتابعها موظف</div>
+              <div><b id="mOpted">0</b>طلبوا عدم المراسلة</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>جاهزية الإعداد</h3>
+            <p class="sub">أكمل هذه الخطوات قبل التشغيل</p>
+            <div class="checks">
+              <div class="check" id="ck-server"><span class="mark"></span><div class="t">رابط الخادم<small>رابط api.php على استضافتك</small></div><button class="link" data-go="conn">تعديل</button></div>
+              <div class="check" id="ck-keys"><span class="mark"></span><div class="t">مفتاح API ورمز التحقق<small>للاتصال الآمن بالخادم</small></div><button class="link" data-go="conn">تعديل</button></div>
+              <div class="check" id="ck-meta"><span class="mark"></span><div class="t">مفاتيح Meta<small>App Secret ورمز Instagram</small></div><button class="link" data-go="conn">تعديل</button></div>
+              <div class="check" id="ck-wa"><span class="mark"></span><div class="t">رقم واتساب ونص الرد<small>الرسالة التي تصل للعملاء</small></div><button class="link" data-go="msg">تعديل</button></div>
+              <div class="check" id="ck-test"><span class="mark"></span><div class="t">اختبار الاتصال<small id="ck-test-sub">لم يُختبر بعد</small></div><button class="link" id="ckTestBtn">اختبار</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- الاتصال والمفاتيح -->
+      <section class="page" id="page-conn">
+        <div class="grid two">
+          <div class="card">
+            <h3>خادم الاستقبال (PHP)</h3>
+            <p class="sub">البرنامج يتصل بالخادم ولا يفتح أي بورت على جهازك</p>
+            <div class="form">
+              <div class="field">
+                <label for="server_url">رابط api.php</label>
+                <div class="inp"><input id="server_url" class="ltr" placeholder="https://your-domain.com/php/api.php" spellcheck="false"></div>
+              </div>
+              <div class="field">
+                <label for="api_key">مفتاح API</label>
+                <div class="inp">
+                  <div style="position:relative;flex:1;display:flex"><input id="api_key" class="ltr pw" type="password" spellcheck="false"><button class="eye" data-eye="api_key" title="إظهار"></button></div>
+                  <button class="btn" id="btnGenKey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>توليد</button>
+                </div>
+                <div class="hashbox" id="hashbox">
+                  الصق هذه البصمة في <b>php/config.php</b> في <b>api_key_sha256</b>:
+                  <code id="hashVal"></code>
+                  <button class="btn sm" id="btnCopyHash">نسخ البصمة</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="verify_token">رمز التحقق (Verify Token)</label>
+                <div class="inp">
+                  <div style="position:relative;flex:1;display:flex"><input id="verify_token" class="ltr pw" type="password" spellcheck="false"><button class="eye" data-eye="verify_token" title="إظهار"></button></div>
+                  <button class="btn" id="btnCopyVerify">نسخ</button>
+                </div>
+                <div class="hint">ضعه نفسه في إعدادات Webhook على لوحة Meta</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>مفاتيح Meta / Instagram</h3>
+            <p class="sub">تُحفظ مشفرة بـ Windows DPAPI ولا تُرسل إلى خادمك أبداً</p>
+            <div class="form">
+              <div class="field">
+                <label for="app_secret">App Secret</label>
+                <div class="inp"><input id="app_secret" class="ltr pw" type="password" spellcheck="false"><button class="eye" data-eye="app_secret" title="إظهار"></button></div>
+                <div class="hint">من لوحة التطبيق ← App settings ← Basic</div>
+              </div>
+              <div class="field">
+                <label for="ig_token">رمز وصول Instagram</label>
+                <div class="inp"><input id="ig_token" class="ltr pw" type="password" spellcheck="false"><button class="eye" data-eye="ig_token" title="إظهار"></button></div>
+                <div class="hint">بصلاحية instagram_business_manage_messages</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-save>حفظ الإعدادات</button>
+          <button class="btn" id="btnTest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.6a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0M12 20h.01"/></svg><span>اختبار الاتصال</span></button>
+        </div>
+      </section>
+
+      <!-- رسالة الرد -->
+      <section class="page" id="page-msg">
+        <div class="grid two">
+          <div class="card">
+            <h3>محتوى الرد</h3>
+            <p class="sub">الرسالة الموحدة التي تصل لكل من يراسلك</p>
+            <div class="form">
+              <div class="field">
+                <label for="whatsapp">رقم واتساب</label>
+                <div class="inp"><input id="whatsapp" class="ltr" placeholder="213555123456" inputmode="numeric"></div>
+                <div class="hint">بالصيغة الدولية بدون + وبدون صفر البداية</div>
+              </div>
+              <div class="field">
+                <label for="message">نص الرد</label>
+                <textarea id="message"></textarea>
+                <div class="hint">اكتب <b class="mono">{whatsapp}</b> ليُستبدل برقمك تلقائياً</div>
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label for="cooldown_hours">عدم التكرار لنفس الشخص (ساعات)</label>
+                  <div class="inp"><input id="cooldown_hours" type="number" min="0" max="720"></div>
+                </div>
+                <div class="field">
+                  <label for="poll_seconds">فحص الرسائل كل (ثوانٍ)</label>
+                  <div class="inp"><input id="poll_seconds" type="number" min="2" max="300"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>معاينة</h3>
+            <p class="sub">هكذا تظهر المحادثة عند العميل</p>
+            <div class="phone">
+              <div class="phone-top"><span class="avatar"><i></i></span><div><b>your.business</b><small>نشط الآن</small></div></div>
+              <div class="chat">
+                <div class="bubble them">السلام عليكم، بكم هذا المنتج؟</div>
+                <div class="bubble me" id="preview"></div>
+                <div class="meta">تم الإرسال تلقائياً</div>
+              </div>
+            </div>
+            <div class="wa-card">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2s.2-1.1.2-1.2-.2-.2-.5-.3z"/></svg>
+              <div>رابط واتساب: <code id="waLink">https://wa.me/…</code></div>
+            </div>
+          </div>
+        </div>
+        <div class="actions"><button class="btn primary" data-save>حفظ الإعدادات</button></div>
+      </section>
+
+      <!-- الحماية والامتثال -->
+      <section class="page" id="page-safe">
+        <div class="grid two">
+          <div class="card">
+            <h3>قواعد الرد الذكي</h3>
+            <p class="sub">تحمي حسابك وتلتزم بسياسات Meta و Instagram للمراسلة</p>
+            <label class="toggle"><input type="checkbox" id="respect_stop"><span class="sw"></span>
+              <span><b>احترام طلبات الإيقاف</b><small>إذا كتب العميل «توقف» أو «STOP» لا يُرسل له أي رد آلي بعدها (ويعود إذا كتب «ابدأ»)</small></span></label>
+            <label class="toggle"><input type="checkbox" id="bot_disclosure"><span class="sw"></span>
+              <span><b>التنويه بأن الرسالة آلية</b><small>الشفافية مع العملاء — مطلوبة في بعض الدول ويُنصح بها دائماً</small></span></label>
+            <div class="form" style="margin-top:14px">
+              <div class="field">
+                <label for="disclosure_text">نص التنويه</label>
+                <div class="inp"><input id="disclosure_text"></div>
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label for="human_takeover_hours">إيقاف الآلي عند رد موظف (ساعات)</label>
+                  <div class="inp"><input id="human_takeover_hours" type="number" min="0" max="168"></div>
+                  <div class="hint">0 = تعطيل</div>
+                </div>
+                <div class="field">
+                  <label for="max_per_hour">الحد الأقصى للردود في الساعة</label>
+                  <div class="inp"><input id="max_per_hour" type="number" min="1" max="1000"></div>
+                  <div class="hint">يمنع تجاوز حدود Instagram</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>ضمانات مفعّلة دائماً</h3>
+            <p class="sub">لا يمكن تعطيلها</p>
+            <ol class="steps">
+              <li><div><b>نافذة 24 ساعة:</b> لا رد على رسالة مضى عليها أكثر من 24 ساعة، كما تشترط Meta.</div></li>
+              <li><div><b>رد واحد فقط</b> لكل شخص خلال مدة «عدم التكرار»، حتى بعد إعادة تشغيل البرنامج.</div></li>
+              <li><div><b>التحقق من التوقيع:</b> كل رسالة تُفحص بـ App Secret، والمزيف يُرفض.</div></li>
+              <li><div><b>منع التكرار:</b> الرسالة نفسها لا تُعالج مرتين.</div></li>
+              <li><div><b>تمهل تلقائي:</b> إذا طلبت Instagram التمهل يتوقف البرنامج 15 دقيقة، وإذا انتهى الرمز يتوقف وينبهك.</div></li>
+              <li><div><b>تشفير محلي:</b> المفاتيح والذاكرة مشفرة بـ Windows DPAPI، والاتصال بالخادم بـ HTTPS فقط.</div></li>
+              <li><div><b>خصوصية:</b> لا تُعرض معرّفات العملاء كاملة في السجل.</div></li>
+            </ol>
+            <div class="memrow" style="align-items:center">
+              <div style="flex:1">مسح ذاكرة الردود السابقة (تبقى قائمة من طلبوا عدم المراسلة)</div>
+              <button class="btn danger sm" id="btnResetMem">مسح الذاكرة</button>
+            </div>
+          </div>
+        </div>
+        <div class="actions"><button class="btn primary" data-save>حفظ الإعدادات</button></div>
+      </section>
+
+      <!-- السجل -->
+      <section class="page" id="page-logs">
+        <div class="log-tools">
+          <button class="chip active" data-filter="all">الكل</button>
+          <button class="chip" data-filter="ok">نجاح</button>
+          <button class="chip" data-filter="warn">تنبيهات</button>
+          <button class="chip" data-filter="error">أخطاء</button>
+          <div style="flex:1"></div>
+          <button class="btn ghost sm" id="btnClear">مسح السجل</button>
+        </div>
+        <div class="log" id="log"><div class="empty">السجل فارغ</div></div>
+      </section>
+
+      <!-- دليل الإعداد -->
+      <section class="page" id="page-help">
+        <div class="grid two">
+          <div class="card">
+            <h3>خطوات الإعداد</h3>
+            <p class="sub">مرة واحدة فقط</p>
+            <ol class="steps">
+              <li><div>في <b>الاتصال والمفاتيح</b> اضغط <b>توليد</b> بجانب مفتاح API ثم انسخ البصمة.</div></li>
+              <li><div>الصق البصمة في <code>php/config.php</code> ثم ارفع مجلد <code>php</code> على استضافة تدعم HTTPS.</div></li>
+              <li><div>أدخل رابط <code>api.php</code> و App Secret ورمز Instagram ثم <b>احفظ</b> واضغط <b>اختبار الاتصال</b>.</div></li>
+              <li><div>في لوحة Meta ← Instagram ← Webhooks ضع الرابط <code>…/php/webhook.php</code> ورمز التحقق نفسه، واشترك في <code>messages</code>.</div></li>
+              <li><div>اكتب رقم واتساب ونص الرد في <b>رسالة الرد</b>، ثم اضغط <b>تشغيل الرد التلقائي</b>.</div></li>
+            </ol>
+          </div>
+          <div class="card">
+            <h3>كيف يعمل</h3>
+            <p class="sub">بدون بورتات مفتوحة وبدون مفاتيح على الخادم</p>
+            <ol class="steps">
+              <li><div>Meta ترسل كل رسالة جديدة إلى <code>webhook.php</code> فيخزنها كما هي.</div></li>
+              <li><div>هذا البرنامج يسحب الرسائل من الخادم كل بضع ثوانٍ (اتصال صادر فقط).</div></li>
+              <li><div>يتحقق من توقيع Meta بـ App Secret، ثم يرد عبر Instagram API.</div></li>
+              <li><div>لا يرد على الشخص نفسه مرتين خلال مدة «عدم التكرار».</div></li>
+            </ol>
+            <div class="wa-card" style="background:rgba(245,184,75,.07);border-color:rgba(245,184,75,.25)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f5b84b" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+              <div>أبقِ البرنامج مفتوحاً. Instagram لا يسمح بالرد بعد 24 ساعة من رسالة العميل.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const T = window.__TAURI__;
+const invoke = T ? T.core.invoke : async () => { throw "خارج البرنامج"; };
+const listen = T ? T.event.listen : async () => {};
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const FIELDS = ["server_url","api_key","verify_token","app_secret","ig_token","whatsapp","message","cooldown_hours","poll_seconds","disclosure_text","human_takeover_hours","max_per_hour"];
+const BOOLS = ["respect_stop","bot_disclosure"];
+const NUMS = { cooldown_hours:[0,24], poll_seconds:[2,5], human_takeover_hours:[0,12], max_per_hour:[1,150] };
+let base = {};             // الإعدادات المحملة (للحفاظ على graph_version)
+let running = false;
+let logs = [];
+let filter = "all";
+let errCount = 0;
+let tested = false;
+
+const PAGES = {
+  dash: ["لوحة التحكم", "نظرة عامة على نشاط الرد التلقائي"],
+  conn: ["الاتصال والمفاتيح", "ربط البرنامج بخادم PHP وبحساب Instagram"],
+  msg:  ["رسالة الرد", "الرسالة الموحدة التي تحيل العملاء إلى واتساب"],
+  safe: ["الحماية والامتثال", "رد ذكي وآمن يلتزم بسياسات Meta و Instagram"],
+  logs: ["السجل", "كل ما يقوم به البرنامج لحظة بلحظة"],
+  help: ["دليل الإعداد", "كل ما تحتاجه لتشغيل البرنامج أول مرة"],
+};
+
+const ICON_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 4.1-5.1M9.9 5.2A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2M2 2l20 20"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+/* ---------- التنقل ---------- */
+function go(page){
+  $$("#nav button").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  $$(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + page));
+  $("#pageTitle").textContent = PAGES[page][0];
+  $("#pageSub").textContent = PAGES[page][1];
+  if (page === "logs") { errCount = 0; updateBadge(); }
+}
+$$("#nav button").forEach(b => b.onclick = () => go(b.dataset.page));
+$$("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+
+/* ---------- إشعارات ---------- */
+function toast(text, kind = "info"){
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.innerHTML = '<span class="bar"></span><span></span>';
+  el.lastChild.textContent = String(text);
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.style.transition = ".3s"; el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, 3800);
+}
+
+/* ---------- الحقول ---------- */
+function fill(s){
+  base = s;
+  for (const k of FIELDS) { const el = $("#" + k); if (el) el.value = s[k] ?? ""; }
+  for (const k of BOOLS) $("#" + k).checked = s[k] !== false;
+  if (!s.verify_token) $("#verify_token").value = randHex(16);
+  refresh();
+}
+function collect(){
+  const s = { ...base };
+  for (const k of FIELDS) s[k] = $("#" + k).value;
+  for (const k of BOOLS) s[k] = $("#" + k).checked;
+  for (const [k,[min,def]] of Object.entries(NUMS)) { const n = parseInt(s[k]); s[k] = Math.max(min, isNaN(n) ? def : n); }
+  return s;
+}
+function randHex(n){ const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b => b.toString(16).padStart(2,"0")).join(""); }
+function esc(t){ const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+$$(".eye").forEach(b => {
+  b.innerHTML = ICON_EYE;
+  b.onclick = e => {
+    e.preventDefault();
+    const inp = $("#" + b.dataset.eye);
+    const show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    b.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
+  };
+});
+
+/* ---------- المعاينة والجاهزية ---------- */
+function refresh(){
+  const wa = $("#whatsapp").value.replace(/\D/g, "");
+  let msg = ($("#message").value || "").trim().replaceAll("{whatsapp}", wa || "…");
+  if (msg && $("#bot_disclosure").checked && $("#disclosure_text").value.trim()) msg += "\n\n" + $("#disclosure_text").value.trim();
+  const link = "https://wa.me/" + (wa || "…");
+  $("#waLink").textContent = link;
+  $("#preview").innerHTML = esc(msg).replace(/(https?:\/\/[^\s]+)/g, '<a>$1</a>') || '<span style="opacity:.6">اكتب نص الرد…</span>';
+
+  const s = collect();
+  setCheck("ck-server", /^https?:\/\/.+/.test(s.server_url.trim()));
+  setCheck("ck-keys", s.api_key.trim().length >= 32 && s.verify_token.trim().length >= 8);
+  setCheck("ck-meta", s.app_secret.trim() && s.ig_token.trim());
+  setCheck("ck-wa", wa.length >= 8 && s.message.trim());
+  setCheck("ck-test", tested);
+}
+function setCheck(id, ok){
+  const el = $("#" + id);
+  el.classList.toggle("done", !!ok);
+  el.querySelector(".mark").innerHTML = ok ? ICON_CHECK : "";
+}
+FIELDS.concat(BOOLS).forEach(k => $("#" + k).addEventListener("input", refresh));
+
+/* ---------- الحالة ---------- */
+function setRunning(v){
+  running = v;
+  const b = $("#btnToggle");
+  b.className = "btn big " + (v ? "danger" : "primary");
+  b.innerHTML = (v ? ICON_STOP : ICON_PLAY) + "<span>" + (v ? "إيقاف الرد التلقائي" : "تشغيل الرد التلقائي") + "</span>";
+  b.disabled = false;
+  $("#sideStatus").classList.toggle("running", v);
+  $("#sideStatusText").textContent = v ? "يعمل — يستقبل الرسائل" : "متوقف";
+  $("#btnGenKey").disabled = v;
+}
+function setMem(m){ if (!m) return; $("#mContacts").textContent = m.contacts; $("#mHuman").textContent = m.human; $("#mOpted").textContent = m.opted_out; }
+async function pollStatus(){ try { const st = await invoke("get_status"); setMem(st.memory); } catch {} }
+setInterval(pollStatus, 5000);
+function setStats(st){
+  $("#stReplied").textContent = st.replied ?? 0;
+  $("#stProcessed").textContent = st.processed ?? 0;
+  $("#stSkipped").textContent = st.skipped ?? 0;
+  $("#stErrors").textContent = st.errors ?? 0;
+  if (st.last_activity) $("#lastAct").textContent = "آخر نشاط: " + st.last_activity;
+}
+
+/* ---------- السجل ---------- */
+const LV = { ok:"نجاح", info:"معلومة", warn:"تنبيه", error:"خطأ" };
+const LVC = { ok:"var(--ok)", info:"var(--info)", warn:"var(--warn)", error:"var(--err)" };
+function addLog(l){
+  logs.push(l);
+  if (logs.length > 2000) logs.shift();
+  if (l.level === "error" && !$("#page-logs").classList.contains("active")) { errCount++; updateBadge(); }
+  renderLog(true);
+  renderActivity();
+}
+function renderLog(append){
+  const box = $("#log");
+  const list = logs.filter(l => filter === "all" || l.level === filter);
+  if (!list.length) { box.innerHTML = '<div class="empty">السجل فارغ</div>'; return; }
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  box.innerHTML = list.map(l =>
+    `<div class="ln"><time>${esc(l.time)}</time><span class="tag ${l.level}">${LV[l.level]||l.level}</span><span class="tx">${esc(l.text)}</span></div>`
+  ).join("");
+  if (!append || atBottom) box.scrollTop = box.scrollHeight;
+}
+function renderActivity(){
+  const recent = logs.slice(-7).reverse();
+  $("#activity").innerHTML = recent.length ? recent.map(l =>
+    `<div class="act"><span class="lv" style="background:${LVC[l.level]}"></span><span class="tx">${esc(l.text)}</span><time>${esc(l.time)}</time></div>`
+  ).join("") : '<div class="empty">ستظهر هنا الردود فور تشغيل البرنامج</div>';
+}
+function updateBadge(){ const b = $("#errBadge"); b.textContent = errCount; b.style.display = errCount ? "inline-block" : "none"; }
+$$("[data-filter]").forEach(c => c.onclick = () => {
+  filter = c.dataset.filter;
+  $$("[data-filter]").forEach(x => x.classList.toggle("active", x === c));
+  renderLog(false);
+});
+$("#btnClear").onclick = () => { logs = []; renderLog(false); renderActivity(); };
+function localLog(level, text){ addLog({ time: new Date().toLocaleTimeString("en-GB"), level, text }); }
+
+/* ---------- الأوامر ---------- */
+async function copy(text){
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t);
+    t.select(); document.execCommand("copy"); t.remove();
+  }
+  toast("تم النسخ", "ok");
+}
+
+$$("[data-save]").forEach(b => b.onclick = async () => {
+  try { await invoke("save", { settings: collect() }); base = collect(); toast("تم حفظ الإعدادات مشفرة", "ok"); }
+  catch (e) { toast(e, "error"); }
+});
+
+$("#btnGenKey").onclick = async () => {
+  if ($("#api_key").value.trim() && !confirm("يوجد مفتاح حالياً. المفتاح الجديد يتطلب تحديث config.php على الخادم. متابعة؟")) return;
+  const r = await invoke("generate_key");
+  $("#api_key").value = r.key;
+  $("#hashVal").textContent = r.hash;
+  $("#hashbox").classList.add("show");
+  await copy(r.hash);
+  tested = false; refresh();
+  toast("نُسخت البصمة — الصقها في config.php ثم احفظ", "info");
+};
+$("#btnCopyHash").onclick = () => copy($("#hashVal").textContent);
+$("#btnCopyVerify").onclick = () => copy($("#verify_token").value);
+
+async function test(){
+  const b = $("#btnTest"); const label = b.innerHTML;
+  b.disabled = true; b.innerHTML = '<span class="spin"></span><span>جارٍ الاختبار…</span>';
+  try {
+    const r = await invoke("test_connection", { settings: collect() });
+    tested = true;
+    $("#ck-test-sub").textContent = "ناجح — طلبات في الانتظار: " + (r.pending ?? 0);
+    localLog("ok", "الاتصال بالخادم ناجح — طلبات في الانتظار: " + (r.pending ?? 0) + (r.verify_synced ? " · تمت مزامنة رمز التحقق" : ""));
+    if (r.ig_username) { localLog("ok", "رمز Instagram صالح — الحساب: @" + r.ig_username); toast("متصل بحساب @" + r.ig_username, "ok"); }
+    else if (r.ig_error) { tested = false; $("#ck-test-sub").textContent = "الخادم ناجح، لكن رمز Instagram: " + r.ig_error; localLog("error", "رمز Instagram: " + r.ig_error); toast("رمز Instagram غير صالح", "error"); }
+    else toast("الاتصال بالخادم ناجح", "ok");
+  } catch (e) {
+    tested = false;
+    $("#ck-test-sub").textContent = "فشل: " + e;
+    localLog("error", "فشل الاتصال: " + e);
+    toast(e, "error");
+  } finally { b.disabled = false; b.innerHTML = label; refresh(); }
+}
+$("#btnTest").onclick = test;
+$("#btnResetMem").onclick = async () => {
+  if (!confirm("مسح ذاكرة الردود؟ قد يتلقى العملاء الذين رُد عليهم مؤخراً رداً جديداً.")) return;
+  try { await invoke("reset_memory"); pollStatus(); toast("تم مسح الذاكرة", "ok"); } catch (e) { toast(e, "error"); }
+};
+$("#ckTestBtn").onclick = test;
+
+$("#btnToggle").onclick = async () => {
+  const b = $("#btnToggle");
+  b.disabled = true;
+  try {
+    if (running) await invoke("stop");
+    else { await invoke("start", { settings: collect() }); base = collect(); }
+  } catch (e) { toast(e, "error"); b.disabled = false; }
+};
+
+/* ---------- البداية ---------- */
+(async () => {
+  try {
+    fill(await invoke("get_settings"));
+    const st = await invoke("get_status");
+    setRunning(st.running); setStats(st.stats); setMem(st.memory);
+  } catch (e) { setRunning(false); fill({ cooldown_hours: 24, poll_seconds: 5, message: "" }); }
+  await listen("log", e => addLog(e.payload));
+  await listen("stats", e => setStats(e.payload));
+  await listen("state", e => { setRunning(!!e.payload); pollStatus(); });
+  await listen("alert", e => { toast(e.payload, "error"); go("conn"); });
+  localLog("info", "جاهز. المفاتيح تُحفظ مشفرة على هذا الجهاز ولا يُفتح أي بورت.");
+})();
+</script>
+</body>
+</html>

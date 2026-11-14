@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -21,3 +24,16 @@ jobs:
         with:
           name: insta-autoreply-gui
           path: windows-app/target/release/insta-autoreply-gui.exe
+
+      # نسخة من آخر بناء في فرع "build" لسهولة التحميل
+      - name: Publish exe to build branch
+        shell: bash
+        run: |
+          mkdir out && cp windows-app/target/release/insta-autoreply-gui.exe out/
+          cd out
+          git init -q -b build
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add insta-autoreply-gui.exe
+          git commit -q -m "Build ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" build
